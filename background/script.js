@@ -198,7 +198,8 @@ function extractPrincipalPlusRoleAndAssumeRole(samlattribute, SAMLAssertion, Ses
         if (DebugLogs) console.log('DEBUG: Additional Role ARNs are configured');
 				var profileList = Object.keys(RoleArns);
 				console.log('INFO: Do additional assume-role for role -> ' + RoleArns[profileList[0]]);
-				assumeAdditionalRole(profileList, 0, data.Credentials.AccessKeyId, data.Credentials.SecretAccessKey, data.Credentials.SessionToken, docContent, SessionDuration);
+				//assumeAdditionalRole(profileList, 0, data.Credentials.AccessKeyId, data.Credentials.SecretAccessKey, data.Credentials.SessionToken, docContent, SessionDuration);
+				assumeAdditionalRole(profileList, 0, PrincipalArn, SAMLAssertion, docContent, SessionDuration);
 			}
 		}        
 	});
@@ -207,14 +208,18 @@ function extractPrincipalPlusRoleAndAssumeRole(samlattribute, SAMLAssertion, Ses
 
 // Will fetch additional STS keys for 1 role from the RoleArns dict
 // The assume-role API is called using the credentials (STS keys) fetched using the SAML claim. Basically the default profile.
-function assumeAdditionalRole(profileList, index, AccessKeyId, SecretAccessKey, SessionToken, docContent, SessionDuration) {
+//function assumeAdditionalRole(profileList, index, AccessKeyId, SecretAccessKey, SessionToken, docContent, SessionDuration) {
+function assumeAdditionalRole(profileList, index, PrincipalArn, SAMLAssertion, docContent, SessionDuration) {
+	
 	// Set the fetched STS keys from the SAML response as credentials for doing the API call
-	var options = {'accessKeyId': AccessKeyId, 'secretAccessKey': SecretAccessKey, 'sessionToken': SessionToken};
-	var sts = new AWS.STS(options);
+	//var options = {'accessKeyId': AccessKeyId, 'secretAccessKey': SecretAccessKey, 'sessionToken': SessionToken};
+	var sts = new AWS.STS();
 	// Set the parameters for the AssumeRole API call. Meaning: What role to assume
 	var params = {
+		PrincipalArn: PrincipalArn,
 		RoleArn: RoleArns[profileList[index]],
-		RoleSessionName: profileList[index]
+		SAMLAssertion: SAMLAssertion
+		
 	};
   if (SessionDuration !== null) {
     params['DurationSeconds'] = SessionDuration;
@@ -226,7 +231,8 @@ function assumeAdditionalRole(profileList, index, AccessKeyId, SecretAccessKey, 
   }
 
 	// Call the API
-	sts.assumeRole(params, function(err, data) {
+	//sts.assumeRole(params, function(err, data) {
+	sts.assumeRoleWithSAML(params, function(err, data) {
 		if (err) console.log(err, err.stack); // an error occurred
 		else {
 			docContent += LF + LF +
@@ -245,7 +251,8 @@ function assumeAdditionalRole(profileList, index, AccessKeyId, SecretAccessKey, 
 		// Otherwise, this is the last profile/role in the RoleArns dict. Proceed to creating the credentials file
 		if (index < profileList.length - 1) {
 			console.log('INFO: Do additional assume-role for role -> ' + RoleArns[profileList[index + 1]]);
-			assumeAdditionalRole(profileList, index + 1, AccessKeyId, SecretAccessKey, SessionToken, docContent);
+			//assumeAdditionalRole(profileList, index + 1, AccessKeyId, SecretAccessKey, SessionToken, docContent);
+			assumeAdditionalRole(profileList, index + 1, PrincipalArn, SAMLAssertion, docContent, SessionDuration);
 		} else {
 			outputDocAsDownload(docContent);
 		}
